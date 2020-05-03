@@ -1,0 +1,147 @@
+<!doctype html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Final Project Prototyping</title>    
+    <style>
+        body {
+            text-align: center;
+        }
+    </style>
+</head>
+<body>
+    <h2>YouTube Video Trends</h2>
+    <div id="my_dataviz"></div>
+
+    <script src="https://d3js.org/d3.v5.min.js"></script>
+    <script>
+
+    // set the dimensions and margins of the graph
+    var margin = {top: 10, right: 30, bottom: 30, left: 60},
+        width = 460 - margin.left - margin.right,
+        height = 400 - margin.top - margin.bottom;
+
+    // append the svg object to the body of the page
+    var svg = d3.select("#my_dataviz")
+      .append("svg")
+        .attr("width", width + margin.left + margin.right)
+        .attr("height", height + margin.top + margin.bottom)
+      .append("g")
+        .attr("transform",
+              "translate(" + margin.left + "," + margin.top + ")");
+
+    //Read the data
+    d3.csv("youtube-new/allvideos_shortened.csv").then(function(data) {
+        data.forEach(function(d) {
+        d.category_id = +d.category_id;
+        d.views = +d.views;
+        d.likes = +d.likes;
+        d.dislikes = +d.dislikes;
+        d.comments = +d.comments;
+        d.percent_upvoted = +d.percent_upvoted;
+    });
+        // group the data: I want to draw one line per group
+        var videoGroups = d3.nest() // nest function allows to group the calculation per level of a factor
+        .key(function(d) { return d.video_id;})
+        .entries(data);
+
+        // Add X axis --> it is a date format
+        var x = d3.scaleLinear()
+        .domain(d3.extent(data, function(d) { return d3.timeParse("%y.%d.%m")(d.trending_date); }))
+        .range([ 0, width ]);
+        svg.append("g")
+        .attr("transform", "translate(0," + height + ")")
+        .call(d3.axisBottom(x).ticks(5));
+
+        // Add Y axis
+        var y = d3.scaleLinear()
+        .domain([0, d3.max(data, function(d) { return +d.views; })])
+        .range([ height, 0 ]);
+        svg.append("g")
+        .call(d3.axisLeft(y));
+
+        // color palette
+        var color = d3.scaleLinear()
+        .domain(d3.extent(data, function(d) { return d.percent_upvoted; }))
+        .range([d3.rgb('#c73228'),d3.rgb('#ffffff'), d3.rgb('#248030')]);
+        // Draw the line
+        svg.selectAll(".line")
+          .data(videoGroups)
+          .enter()
+          .append("path")
+            .attr("fill", "none")
+            .attr("stroke", function(d, i){ if (i<10) { console.log(d); } return "red"; })
+            .attr("stroke-width", 1.5)
+            .attr("d", function(d){
+              return d3.line()
+                .x(function(d) { return x(d3.timeParse("%y.%d.%m")(d.trending_date)); })
+                .y(function(d) { return y(+d.views); })
+                (d.values)
+            })
+
+        })
+
+</script>
+<!--
+//  // process the data
+//d3.csv("youtube-new/allvideos_shortened.csv",(error, data) => {
+//  if (error) throw error;
+//  
+//  // Parse the data
+//  data.forEach(d => {
+//      d.category_id = +d.category_id;
+//      d.views = +d.views;
+//      d.likes = +d.likes;
+//      d.dislikes = +d.dislikes;
+//      d.comments = +d.comments;
+//  });
+//  // Set domain scales
+//  x.domain(d3.extent(data, d => d.tick));
+//  y.domain(d3.extent(data, d => d['views']));
+//  
+//  // Draw Paths
+//  for (var video of videos) {
+//    svg.append("path")
+//    	  .data([data])
+//        .attr("class", "line line--"+dim)
+//    		.attr("name", dim)
+//        .attr("d", d => lines[dim](d))
+//    		.on("mouseover", mouseover)
+//    		.on("mouseout", mouseout)
+//  }
+//  
+//  // Add the X Axis
+//  svg.append("g")
+//      .attr("transform", "translate(0," + height + ")")
+//      .call(d3.axisBottom(x));
+//  
+//  // Add the Y Axis (Note how we only need one axis)
+//  svg.append("g")
+//      .attr("class", "axisSteelBlue")
+//      .call(d3.axisLeft(Y['x']));
+//  
+//  // mouseover function
+//  function mouseover(d) {
+//    var name = d3.select(this).attr("name");
+//    
+//    // highlight this line, fade other lines
+//    d3.selectAll(".line").classed("line--hover", (d, i) => {
+//      return (name === dims[i]);
+//    }).classed("line--fade", (d, i) => {
+//      return (name !== dims[i]);
+//    });
+//    
+//  
+//  // mouseout function
+//  function mouseout(d) {
+//    // turn off hover and fade effects
+//    d3.selectAll(".line")
+//      .classed("line--hover", false)
+//      .classed("line--fade", false);
+//  }
+});
+-->
+
+    
+</body>
+</html>
