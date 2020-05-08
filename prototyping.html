@@ -6,21 +6,36 @@
     <style>
         body {
             text-align: center;
+            font-family: "Roboto";
+
         }
+        
+        .xSelection {
+            position: absolute;
+            width: 100px;
+            top:90vh;
+            left:47vw;
+        }
+        
+        .titles {
+            font-size: 0.8em;
+        }
+        
     </style>
 </head>
 <body>
     <h2>YouTube Video Trends</h2>
     <div id="my_dataviz"></div>
-
+    
     <script src="https://d3js.org/d3.v5.min.js"></script>
     <script>
 
     // set the dimensions and margins of the graph
-    var margin = {top: 10, right: 30, bottom: 30, left: 60},
-        width = 700 - margin.left - margin.right,
-        height = 500 - margin.top - margin.bottom;
-
+    var margin = {top: 20, right: 30, bottom: 30, left: 60},
+        width = 900 - margin.left - margin.right,
+        height = 600 - margin.top - margin.bottom;
+    var xAxes=["Time", "Comments"];
+    var timeNotComments=true;
     // append the svg object to the body of the page
     var svg = d3.select("#my_dataviz")
       .append("svg")
@@ -32,14 +47,15 @@
 
     //Read the data
     d3.csv("youtube-new/allvideos_shortened.csv").then(function(data) {
-        data.forEach(function(d) {
-        d.category_id = +d.category_id;
-        d.views = +d.views;
-        d.likes = +d.likes;
-        d.dislikes = +d.dislikes;
-        d.comments = +d.comments;
-        d.percent_upvoted = +d.percent_upvoted;
-    });
+            data.forEach(function(d) {
+            d.category_id = +d.category_id;
+            d.views = +d.views;
+            d.likes = +d.likes;
+            d.dislikes = +d.dislikes;
+            d.comment_count = +d.comment_count;
+            d.percent_upvoted = +d.percent_upvoted;
+            d.percent_scaled = +d.percent_scaled;
+        });
         // group the data: I want to draw one line per group
         var videoGroups = d3.nest() // nest function allows to group the calculation per level of a factor
         .key(function(d) { return d.video_id;})
@@ -47,44 +63,167 @@
         .entries(data);
 
         // Add X axis --> it is a date format
-        var x = d3.scaleLinear()
-        .domain(d3.extent(data, function(d) { return d3.timeParse("%y.%d.%m")(d.trending_date); }))
-        .range([ 0, width ]);
-        svg.append("g")
-        .attr("transform", "translate(0," + height + ")")
-        .call(d3.axisBottom(x).tickFormat(d3.timeFormat("%m/%d/%y")));
+        var timeDomain=d3.extent(data, function(d) { return d3.timeParse("%y.%d.%m")(d.trending_date); });
+        var commentsDomain=d3.extent(data, function(d) { return d.comment_count; });
+        console.log(commentsDomain);
+        var xScale = d3.scaleLinear().range([ 0, width ]);
 
+        var yScale = d3.scaleLinear()
+            .domain([0, d3.max(data, function(d) { return +d.views; })])
+            .range([ height, 0 ]);
+
+        var xAxisCall = d3.axisBottom();
+        
+        
         // Add Y axis
-        var y = d3.scaleLinear()
-        .domain([0, d3.max(data, function(d) { return +d.views; })])
-        .range([ height, 0 ]);
-        svg.append("g")
-        .call(d3.axisLeft(y));
+        var y = svg.append("g")
+            .call(d3.axisLeft(yScale).tickFormat(d3.formatPrefix(".0", 1e6)));
+        
+        var select = d3.select("#my_dataviz")
+            .append("select")
+            .attr("class", "xSelection")
+            .on("change", function() {
+                if (timeNotComments) {
+                    timeNotComments=false;
+                    console.log("Time");
+                    setCommentsScale();
+                    updateAxis();
+                    updateLines();
+                }
+                else {
+                    timeNotComments=true;
+                    setTimeScale();
+                    updateAxis();
+                    updateLines();
+                }
+            });
+        
+        select.selectAll('option')
+            .data(xAxes)
+            .enter()
+            .append("option")
+            .text(function(d) { return d; });
 
         // color palette
         var color = d3.scaleLinear()
-        .domain(d3.extent(data, function(d) { return Math.pow(d.percent_upvoted, 4); }))
+        .domain(d3.extent(data, function(d) { return d.percent_scaled; }))
         .range([d3.rgb('#c73228'), d3.rgb('#248030')]);
-        // Draw the line
-        svg.selectAll(".line")
-          .data(videoGroups)
-          .enter()
-          .append("path")
-            .attr("fill", "none")
-            .attr("stroke", function(d, i){ 
-                lastRecord=d.values.slice(-1)[0]; 
-                if (lastRecord.dislikes==0 & lastRecord.likes==0) { return "#808080"; }
-                return color(Math.pow(lastRecord.percent_upvoted, 4)); 
-            })
-            .attr("stroke-width", 1.5)
-            .attr("d", function(d){
-              return d3.line()
-                .x(function(d) { return x(d3.timeParse("%y.%d.%m")(d.trending_date)); })
-                .y(function(d) { return y(+d.views); })
-                (d.values)
-            })
+        
+        // Switch Axis
+        function setTimeScale(){
+            xScale.domain(timeDomain)
+            xAxisCall.scale(xScale).tickFormat(d3.timeFormat("%m/%d/%y"));
+        }
 
-        })
+        function setCommentsScale(){
+            xScale.domain(commentsDomain)
+            xAxisCall.scale(xScale).tickFormat(d3.formatPrefix(".0", 1e5));
+        }
+
+        function initAxis() {
+            svg.append("g")
+                .attr("class", "xAxis")
+                .attr("transform", "translate(0," + height + ")")
+                .call(xAxisCall);
+        }
+        function updateAxis(){
+            var t = d3.transition()
+                .duration(500)
+
+            svg.select(".xAxis")
+                .transition(t)
+                .call(xAxisCall);
+        }  
+        
+        function updateLines() {
+            var t = d3.transition()
+                .duration(500)
+            // Draw the line
+            var lines=svg.selectAll(".line")
+              .data(videoGroups);
+            
+            lines.enter()
+              .append("path")
+                .attr("fill", "none")
+                .attr("class", "line")
+                .attr("stroke", function(d, i){ 
+                    lastRecord=d.values.slice(-1)[0]; 
+                    if (lastRecord.dislikes==0 & lastRecord.likes==0) { return "#808080"; }
+                    return color(lastRecord.percent_scaled); 
+                })
+                .attr("stroke-width", 2.5)
+                .attr("d", function(d){
+                  return d3.line()
+                    .x(function(d) { 
+                      if (timeNotComments) { 
+                          return xScale(d3.timeParse("%y.%d.%m")(d.trending_date)); 
+                        }
+                      else {
+                          return xScale(d.comment_count);
+                      } })
+                    .y(function(d) { return yScale(+d.views); })
+                    (d.values)
+                });
+            
+            lines.transition(t)
+                .attr("d", function(d){
+                  return d3.line()
+                    .x(function(d) { 
+                      if (timeNotComments) { 
+                          return xScale(d3.timeParse("%y.%d.%m")(d.trending_date)); 
+                        }
+                      else {
+                          return xScale(d.comment_count);
+                      } })
+                    .y(function(d) { return yScale(+d.views); })
+                    (d.values)
+                });
+            
+            titles=svg.selectAll(".titles")
+                .data(videoGroups.filter(function(d) { 
+                    lastRecord=d.values.slice(-1)[0];
+                    return lastRecord.show_title=="TRUE";
+                }));
+            titles
+                .enter()
+                .append("text")
+                .attr("class", "titles")
+                .attr("transform", function(d) {
+                    lastRecord=d.values.slice(-1)[0];
+                    var xTransform;
+                    if (timeNotComments) {
+                        xTransform= xScale(d3.timeParse("%y.%d.%m")(lastRecord.trending_date));
+                    } else {
+                        xTransform=xScale(lastRecord.comment_count);
+                    }
+                    return "translate("+xTransform+","+yScale(lastRecord.views)+")";
+                })
+                .attr("dy", "-.35em")
+                .attr("dx", "-2em")
+                .attr("text-anchor", "start")
+                .text(function(d) {
+                    lastRecord=d.values.slice(-1)[0];
+                    return lastRecord.title;
+                });
+            
+            titles.attr("transform", function(d) {
+                    lastRecord=d.values.slice(-1)[0];
+                    var xTransform;
+                    if (timeNotComments) {
+                        xTransform= xScale(d3.timeParse("%y.%d.%m")(lastRecord.trending_date));
+                    } else {
+                        xTransform=xScale(lastRecord.comment_count);
+                    }
+                    return "translate("+xTransform+","+yScale(lastRecord.views)+")";
+                })
+
+            lines.exit().remove();
+            titles.exit().remove();
+        }
+        setTimeScale();
+        initAxis();
+        updateLines();
+    })
 
 </script>
 <!--
