@@ -21,6 +21,22 @@
             font-size: 0.8em;
         }
         
+        .tooltip {	
+            position: absolute;			
+            text-align: center;			
+            display: inline-block;
+            padding: 2px;				
+            font-size: 12px;		
+            color: white; 
+            border: 0px;		
+            border-radius: 4px;			
+            pointer-events: none;			
+        }
+        
+        #legend {
+            font-size: 10px;
+            dominant-baseline: hanging;
+        }
     </style>
 </head>
 <body>
@@ -29,10 +45,9 @@
     
     <script src="https://d3js.org/d3.v5.min.js"></script>
     <script>
-
     // set the dimensions and margins of the graph
-    var margin = {top: 20, right: 30, bottom: 30, left: 60},
-        width = 900 - margin.left - margin.right,
+    var margin = {top: 20, right: 200, bottom: 30, left: 60},
+        width = 1300 - margin.left - margin.right,
         height = 600 - margin.top - margin.bottom;
     var xAxes=["Time", "Comments"];
     var timeNotComments=true;
@@ -104,10 +119,54 @@
             .append("option")
             .text(function(d) { return d; });
 
+        var voteRange = d3.extent(data, function(d) { return d.percent_scaled; });
+        var colorRange = ['#c73228', '#fabd05', '#248030'];
+        voteRange.splice(1, 0, voteRange[1]/2);
         // color palette
         var color = d3.scaleLinear()
-        .domain(d3.extent(data, function(d) { return d.percent_scaled; }))
-        .range([d3.rgb('#c73228'), d3.rgb('#248030')]);
+        .domain(voteRange)
+        .range(colorRange);
+        
+        var defs=svg.append("defs");
+        var linGrad = defs.append("linearGradient")
+            .attr("id", "linear-gradient");
+        linGrad
+            .attr("x1", "0%")
+            .attr("y1", "0%")
+            .attr("x2", "100%")
+            .attr("y2", "0%");
+        linGrad.append("stop")
+            .attr("offset", "0%")
+            .attr("stop-color", colorRange[0]);
+        linGrad.append("stop")
+            .attr("offset", "50%")
+            .attr("stop-color", colorRange[1]);
+        linGrad.append("stop")
+            .attr("offset", "100%")
+            .attr("stop-color", colorRange[2]);
+        
+        // Legend
+        var legW=150;
+        var legH=15;
+        var legend = svg.append("g")
+            .attr("id", "legend")
+            .attr("transform", "translate(" + width+ ", 10)");
+        legend.append("rect")
+            .attr("width", legW)
+            .attr("height", legH)
+            .style("fill", "url(#linear-gradient)");
+        legend.append("text")
+            .text("0")
+            .style("text-anchor", "start")
+            .attr("transform", "translate(0," + legH +")");
+        legend.append("text")
+            .text("100")
+            .style("text-anchor", "end")
+            .attr("transform", "translate(" + legW + "," + legH +")");
+        legend.append("text")
+            .text("% Upvoted")
+            .style("text-anchor", "middle")
+            .attr("transform", "translate(" + legW/2 + "," + legH +")");
         
         // Switch Axis
         function setTimeScale(){
@@ -135,7 +194,10 @@
                 .call(xAxisCall);
         }  
         
-        function updateLines() {
+        function updateLines()  {
+            var tooltip = d3.select("body").append("div")	
+                .attr("class", "tooltip")				
+                .style("opacity", 0);
             var t = d3.transition()
                 .duration(500)
             // Draw the line
@@ -146,7 +208,7 @@
               .append("path")
                 .attr("fill", "none")
                 .attr("class", "line")
-                .attr("stroke", function(d, i){ 
+                .attr("stroke", function(d){ 
                     lastRecord=d.values.slice(-1)[0]; 
                     if (lastRecord.dislikes==0 & lastRecord.likes==0) { return "#808080"; }
                     return color(lastRecord.percent_scaled); 
@@ -163,6 +225,27 @@
                       } })
                     .y(function(d) { return yScale(+d.views); })
                     (d.values)
+                })
+                .on("mouseover", function(d) {
+                    lastRecord=d.values.slice(-1)[0];
+                    tooltip.transition()		
+                        .duration(200)
+                        .style("opacity", .9)
+                        .style("background", function(){ 
+                            if (lastRecord.dislikes==0 & lastRecord.likes==0) { return "#808080"; }
+                            return color(lastRecord.percent_scaled); 
+                        });		
+                    tooltip.html(lastRecord.title + "<br/>"  + lastRecord.channel_title)	
+                        .style("left", (d3.event.pageX) + "px")		
+                        .style("top", (d3.event.pageY - 28) + "px");	
+                    })		
+                .on("mousemove", function(){
+                    return tooltip.style("top", (event.pageY-10)+"px").style("left",(event.pageX+10)+"px");
+                })
+                .on("mouseout", function(d) {		
+                    tooltip.transition()		
+                        .duration(500)		
+                        .style("opacity", 0);	
                 });
             
             lines.transition(t)
@@ -192,15 +275,15 @@
                     lastRecord=d.values.slice(-1)[0];
                     var xTransform;
                     if (timeNotComments) {
-                        xTransform= xScale(d3.timeParse("%y.%d.%m")(lastRecord.trending_date));
+                        xTransform=xScale(d3.timeParse("%y.%d.%m")(lastRecord.trending_date));
                     } else {
                         xTransform=xScale(lastRecord.comment_count);
                     }
+                    
                     return "translate("+xTransform+","+yScale(lastRecord.views)+")";
                 })
                 .attr("dy", "-.35em")
-                .attr("dx", "-2em")
-                .attr("text-anchor", "start")
+                .attr("text-anchor", "middle")
                 .text(function(d) {
                     lastRecord=d.values.slice(-1)[0];
                     return lastRecord.title;
@@ -216,6 +299,7 @@
                     }
                     return "translate("+xTransform+","+yScale(lastRecord.views)+")";
                 })
+                .attr("text-anchor", "middle")
 
             lines.exit().remove();
             titles.exit().remove();
