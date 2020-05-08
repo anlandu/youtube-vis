@@ -14,7 +14,7 @@
             position: absolute;
             width: 100px;
             top:90vh;
-            left:47vw;
+            left:46vw;
         }
         
         .titles {
@@ -46,11 +46,44 @@
     <script src="https://d3js.org/d3.v5.min.js"></script>
     <script>
     // set the dimensions and margins of the graph
-    var margin = {top: 20, right: 200, bottom: 30, left: 60},
+    var margin = {top: 40, right: 200, bottom: 30, left: 60},
         width = 1300 - margin.left - margin.right,
         height = 600 - margin.top - margin.bottom;
     var xAxes=["Time", "Comments"];
+    var cats = [{cat: "Action/Adventure", selected:true},
+        {cat: "Anime/Animation", selected:true},
+        {cat: "Autos & Vehicles", selected:true},
+        {cat: "Classics", selected:true},
+        {cat: "Comedy", selected:true},
+        {cat: "Documentary", selected:true},
+        {cat: "Drama", selected:true},
+        {cat: "Education", selected:true},
+        {cat: "Entertainment", selected:true},
+        {cat: "Family", selected:true},
+        {cat: "Film & Animation", selected:true},
+        {cat: "Foreign", selected:true},
+        {cat: "Gaming", selected:true},
+        {cat: "Horror", selected:true},
+        {cat: "Howto & Style", selected:true},
+        {cat: "Movies", selected:true},
+        {cat: "Music", selected:true},
+        {cat: "News & Politics", selected:true},
+        {cat: "Nonprofits & Activism", selected:true},
+        {cat: "People & Blogs", selected:true},
+        {cat: "Pets & Animals", selected:true},
+        {cat: "Science & Technology", selected:true},
+        {cat: "Sci-Fi/Fantasy", selected:true},
+        {cat: "Short Movies", selected:true},
+        {cat: "Shorts", selected:true},
+        {cat: "Shows", selected:true},
+        {cat: "Sports", selected:true},
+        {cat: "Thriller", selected:true},
+        {cat: "Trailers", selected:true},
+        {cat: "Travel & Events", selected:true},
+        {cat: "Videoblogging", selected:true}
+    ];
     var timeNotComments=true;
+        
     // append the svg object to the body of the page
     var svg = d3.select("#my_dataviz")
       .append("svg")
@@ -94,6 +127,7 @@
         var y = svg.append("g")
             .call(d3.axisLeft(yScale).tickFormat(d3.formatPrefix(".0", 1e6)));
         
+        // X axis drop down menu
         var select = d3.select("#my_dataviz")
             .append("select")
             .attr("class", "xSelection")
@@ -118,11 +152,21 @@
             .enter()
             .append("option")
             .text(function(d) { return d; });
-
+        
+        // Y axis label
+        svg.append("text")
+            .attr("transform", "rotate(-90)")
+            .attr("y", 0 - margin.left)
+            .attr("x",0 - (height / 2))
+            .attr("dy", "1em")
+            .style("text-anchor", "middle")
+            .text("Views");
+        
+        
+        // Color scale definition
         var voteRange = d3.extent(data, function(d) { return d.percent_scaled; });
         var colorRange = ['#c73228', '#fabd05', '#248030'];
         voteRange.splice(1, 0, voteRange[1]/2);
-        // color palette
         var color = d3.scaleLinear()
         .domain(voteRange)
         .range(colorRange);
@@ -150,7 +194,7 @@
         var legH=15;
         var legend = svg.append("g")
             .attr("id", "legend")
-            .attr("transform", "translate(" + width+ ", 10)");
+            .attr("transform", "translate(" + (width+10)+ ", -"+margin.top+")");
         legend.append("rect")
             .attr("width", legW)
             .attr("height", legH)
@@ -168,7 +212,35 @@
             .style("text-anchor", "middle")
             .attr("transform", "translate(" + legW/2 + "," + legH +")");
         
-        // Switch Axis
+        // Select Categories
+        var checkboxes = svg.selectAll("#catbox")
+            .data(cats)
+            .enter()
+            .append("g")
+            .attr("transform", function(d, i) {
+                yTransform=(-1*margin.top)+i*20+30;
+                xTransform=width+10;
+                return "translate(" + xTransform+ ", "+yTransform+")";
+            })
+            .attr("class", "catbox");
+        checkboxes
+            .append("rect")
+            .attr("width", legW)
+            .attr("height", 15)
+            .style("border-radius", "4px")
+            .style("fill", "#8a8888");
+        checkboxes
+            .append("text")
+            .text(function(d) {
+                return d.cat;
+            })
+            .attr("dx", "0.1em")
+            .attr("dy", "0.2em")
+            .style("font-size", "11px")
+            .style("fill", "white")
+            .style("dominant-baseline", "hanging");
+        
+        // Set/update Axis
         function setTimeScale(){
             xScale.domain(timeDomain)
             xAxisCall.scale(xScale).tickFormat(d3.timeFormat("%m/%d/%y"));
@@ -185,6 +257,7 @@
                 .attr("transform", "translate(0," + height + ")")
                 .call(xAxisCall);
         }
+        
         function updateAxis(){
             var t = d3.transition()
                 .duration(500)
@@ -209,9 +282,9 @@
                 .attr("fill", "none")
                 .attr("class", "line")
                 .attr("stroke", function(d){ 
-                    lastRecord=d.values.slice(-1)[0]; 
-                    if (lastRecord.dislikes==0 & lastRecord.likes==0) { return "#808080"; }
-                    return color(lastRecord.percent_scaled); 
+                    lastRec=d.values.slice(-1)[0]; 
+                    if (lastRec.dislikes==0 & lastRec.likes==0) { return "#808080"; }
+                    return color(lastRec.percent_scaled); 
                 })
                 .attr("stroke-width", 2.5)
                 .attr("d", function(d){
@@ -227,15 +300,15 @@
                     (d.values)
                 })
                 .on("mouseover", function(d) {
-                    lastRecord=d.values.slice(-1)[0];
+                    lastRec=d.values.slice(-1)[0];
                     tooltip.transition()		
                         .duration(200)
                         .style("opacity", .9)
                         .style("background", function(){ 
-                            if (lastRecord.dislikes==0 & lastRecord.likes==0) { return "#808080"; }
-                            return color(lastRecord.percent_scaled); 
+                            if (lastRec.dislikes==0 & lastRec.likes==0) { return "#808080"; }
+                            return color(lastRec.percent_scaled); 
                         });		
-                    tooltip.html(lastRecord.title + "<br/>"  + lastRecord.channel_title)	
+                    tooltip.html(lastRec.title + "<br/>"  + lastRec.channel_title)	
                         .style("left", (d3.event.pageX) + "px")		
                         .style("top", (d3.event.pageY - 28) + "px");	
                     })		
@@ -264,50 +337,96 @@
             
             titles=svg.selectAll(".titles")
                 .data(videoGroups.filter(function(d) { 
-                    lastRecord=d.values.slice(-1)[0];
-                    return lastRecord.show_title=="TRUE";
+                    lastRec=d.values.slice(-1)[0];
+                    return lastRec.show_title=="TRUE";
                 }));
             titles
                 .enter()
                 .append("text")
                 .attr("class", "titles")
                 .attr("transform", function(d) {
-                    lastRecord=d.values.slice(-1)[0];
+                    lastRec=d.values.slice(-1)[0];
                     var xTransform;
                     if (timeNotComments) {
-                        xTransform=xScale(d3.timeParse("%y.%d.%m")(lastRecord.trending_date));
+                        xTransform=xScale(d3.timeParse("%y.%d.%m")(lastRec.trending_date));
+                        if (lastRec.video_id=="VYOjWnS4cMY") {
+                            xTransform-=60;
+                        }
                     } else {
-                        xTransform=xScale(lastRecord.comment_count);
+                        xTransform=xScale(lastRec.comment_count);
+                        if (lastRec.video_id=="_I_D_8Z4sJE" | lastRec.video_id=="wfWkmURBNv8") {
+                            xTransform+=40;
+                        } else if (lastRec.video_id=="9jI-z9QN6g8") {
+                            xTransform+=55;
+                        }
                     }
-                    
-                    return "translate("+xTransform+","+yScale(lastRecord.views)+")";
+                    return "translate("+xTransform+","+yScale(lastRec.views)+")";
                 })
-                .attr("dy", "-.35em")
+                .attr("dy", "-1.95em")
                 .attr("text-anchor", "middle")
-                .text(function(d) {
-                    lastRecord=d.values.slice(-1)[0];
-                    return lastRecord.title;
-                });
+                .append("tspan")
+                    .text(function(d) {
+                        lastRec=d.values.slice(-1)[0];
+                        return splitTitle(lastRec.title)[0];
+                })
+                .append("tspan")
+                    .text(function(d) {
+                        lastRec=d.values.slice(-1)[0];
+                        return splitTitle(lastRec.title)[1];
+                    }) 
+                    .attr("x", "0em")
+                    .attr("dy", "1.2em");
             
             titles.attr("transform", function(d) {
-                    lastRecord=d.values.slice(-1)[0];
+                    lastRec=d.values.slice(-1)[0];
                     var xTransform;
                     if (timeNotComments) {
-                        xTransform= xScale(d3.timeParse("%y.%d.%m")(lastRecord.trending_date));
+                        xTransform=xScale(d3.timeParse("%y.%d.%m")(lastRec.trending_date));
+                        if (lastRec.video_id=="VYOjWnS4cMY") {
+                            xTransform-=60;
+                        }
                     } else {
-                        xTransform=xScale(lastRecord.comment_count);
+                        xTransform=xScale(lastRec.comment_count);
+                        if (lastRec.video_id=="_I_D_8Z4sJE" | lastRec.video_id=="wfWkmURBNv8") {
+                            xTransform+=40;
+                        } else if (lastRec.video_id=="9jI-z9QN6g8") {
+                            xTransform+=55;
+                        }
                     }
-                    return "translate("+xTransform+","+yScale(lastRecord.views)+")";
+                    return "translate("+xTransform+","+yScale(lastRec.views)+")";
                 })
                 .attr("text-anchor", "middle")
 
             lines.exit().remove();
             titles.exit().remove();
         }
+        
+        function splitTitle(s) {
+            var middle = Math.floor(s.length / 2);
+            var before = s.lastIndexOf(' ', middle);
+            var after = s.indexOf(' ', middle + 1);
+
+            if (middle - before < after - middle) {
+                middle = before;
+            } else {
+                middle = after;
+            }
+
+            if (before == -1 || (after != -1 && middle - before >= after - middle)) {
+                middle = after;
+            } else {
+                middle = before;
+            }
+
+            var s1 = s.substr(0, middle);
+            var s2 = s.substr(middle + 1);
+            return [s1, s2];
+        }   
         setTimeScale();
         initAxis();
         updateLines();
     })
+        
 
 </script>
 <!--
